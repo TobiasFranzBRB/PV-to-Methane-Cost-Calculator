@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Technoeconomic Methane (CH₄) Production Calculator</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --bg-color: #f4f7fa;
@@ -184,6 +185,13 @@
             width: 100%;
             max-width: 400px;
             height: auto;
+        }
+
+        .chart-container {
+            position: relative;
+            margin: 20px auto 10px auto;
+            height: 260px;
+            width: 260px;
         }
 
         button {
@@ -395,15 +403,13 @@
                     
                     <!-- Electrolysis & DAC -->
                     <g>
-                         <!-- Water In -->
-                        <text x="50" y="160" text-anchor="middle" font-size="16">💧 Water</text>
+                         <text x="50" y="160" text-anchor="middle" font-size="16">💧 Water</text>
                         <line x1="60" y1="180" x2="115" y2="200" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
                         <rect x="20" y="200" width="160" height="80" rx="10" fill="#e0f2f1" stroke="#00796b" stroke-width="2"/>
                         <text x="100" y="235" text-anchor="middle" font-size="16" font-weight="bold">Electrolysis</text>
                         <text x="100" y="255" text-anchor="middle" font-size="14" fill="#555">H₂ Production</text>
                     </g>
                     <g>
-                        <!-- Air In -->
                         <text x="350" y="160" text-anchor="middle" font-size="16">🌬️ Air</text>
                         <line x1="340" y1="180" x2="285" y2="200" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
                         <rect x="220" y="200" width="160" height="80" rx="10" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="2"/>
@@ -411,7 +417,6 @@
                         <text x="300" y="255" text-anchor="middle" font-size="14" fill="#555">CO₂ Capture</text>
                     </g>
                     
-                     <!-- Connectors to Sabatier -->
                     <line x1="100" y1="280" x2="100" y2="330" stroke="#333" stroke-width="2" />
                     <line x1="300" y1="280" x2="300" y2="330" stroke="#333" stroke-width="2" />
                     <line x1="100" y1="330" x2="180" y2="380" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
@@ -463,7 +468,10 @@
                     <span class="output-grid-value">{{ formatNumber(overall.nm3_ch4_per_m2_year, 2) }} Nm³/m²</span>
                     <span class="output-grid-label"></span>
                     <span class="output-grid-value">{{ formatNumber(overall.kwh_ch4_per_m2_year, 2) }} kWh/m²</span>
-
+                </div>
+                <!-- PIE CHART ADDED HERE -->
+                <div class="chart-container">
+                    <canvas ref="pieChartCanvas"></canvas>
                 </div>
             </div>
 
@@ -539,7 +547,7 @@
 </div>
 
 <script>
-    const { createApp, ref, computed, onMounted } = Vue;
+    const { createApp, ref, computed, onMounted, watch, onBeforeUnmount } = Vue;
 
     createApp({
         setup() {
@@ -565,6 +573,8 @@
             };
 
             const inputs = ref({ ...defaults });
+            const pieChartCanvas = ref(null);
+            let chartInstance = null;
 
             const resetToDefaults = () => {
                 inputs.value = { ...defaults };
@@ -572,9 +582,9 @@
 
             // --- COMPUTED PROPERTIES FOR CALCULATIONS ---
 
-            // 1. ⚡ Utility Solar PV
             const pv = computed(() => {
                 const i = inputs.value;
+                if (i.pv_lifetime <= 0) return { total_capex: 0, total_opex: 0, total_electricity: 0, lcoe_dc: 0, land_area: 0 };
                 const pv_power_kw = i.pv_power * 1000;
                 
                 const total_capex = pv_power_kw * i.pv_capex;
@@ -591,145 +601,159 @@
                 return { total_capex, total_opex, total_electricity, lcoe_dc, land_area };
             });
 
-            // This is a central value needed for many calculations
             const ch4_energy_demand = computed(() => {
                 const i = inputs.value;
                 return (i.h2_stoich * i.h2_energy_demand) + (i.co2_stoich * i.co2_energy_demand);
             });
 
-            // 2. 🌫️ CO₂ Direct Air Capture (DAC)
             const co2 = computed(() => {
                 const i = inputs.value;
-                const total_capex = i.dac_capex * i.pv_power;
-
-                const max_daily_prod = ch4_energy_demand.value > 0 ? (i.pv_power * i.max_daily_pv_yield * 1000 / ch4_energy_demand.value) * i.co2_stoich : 0;
+                if (i.dac_lifetime <= 0 || i.pv_lifetime <= 0) return { max_daily_prod: 0, total_prod: 0, levelized_cost: 0, levelized_cost_capex_pct: 0, levelized_cost_opex_pct: 0, capex_per_kg: 0, opex_per_kg: 0 };
                 
+                const total_capex = i.dac_capex * i.pv_power;
                 const avg_annual_electricity = pv.value.total_electricity / i.pv_lifetime;
                 const total_prod_lifetime_scaled = ch4_energy_demand.value > 0 ? (avg_annual_electricity * i.dac_lifetime / ch4_energy_demand.value) * i.co2_stoich : 0;
 
                 const total_opex = pv.value.lcoe_dc * i.co2_energy_demand * total_prod_lifetime_scaled;
-
                 const levelized_cost = total_prod_lifetime_scaled > 0 ? (total_capex + total_opex) / total_prod_lifetime_scaled : 0;
                 
-                const lcoe_capex_contrib = total_prod_lifetime_scaled > 0 ? total_capex / total_prod_lifetime_scaled : 0;
-                const lcoe_opex_contrib = total_prod_lifetime_scaled > 0 ? total_opex / total_prod_lifetime_scaled : 0;
-                const levelized_cost_capex_pct = levelized_cost > 0 ? (lcoe_capex_contrib / levelized_cost) * 100 : 0;
-                const levelized_cost_opex_pct = levelized_cost > 0 ? (lcoe_opex_contrib / levelized_cost) * 100 : 0;
+                const capex_per_kg = total_prod_lifetime_scaled > 0 ? total_capex / total_prod_lifetime_scaled : 0;
+                const opex_per_kg = total_prod_lifetime_scaled > 0 ? total_opex / total_prod_lifetime_scaled : 0;
 
                 return {
-                    max_daily_prod,
                     total_prod: total_prod_lifetime_scaled,
                     levelized_cost,
-                    levelized_cost_capex_pct,
-                    levelized_cost_opex_pct
+                    levelized_cost_capex_pct: levelized_cost > 0 ? (capex_per_kg / levelized_cost) * 100 : 0,
+                    levelized_cost_opex_pct: levelized_cost > 0 ? (opex_per_kg / levelized_cost) * 100 : 0,
+                    max_daily_prod: ch4_energy_demand.value > 0 ? (i.pv_power * i.max_daily_pv_yield * 1000 / ch4_energy_demand.value) * i.co2_stoich : 0,
+                    capex_per_kg,
+                    opex_per_kg
                 };
             });
             
-            // 3. 💧 Water Electrolysis Unit
             const h2 = computed(() => {
                 const i = inputs.value;
-                const total_capex = i.electrolyzer_capex * i.pv_power;
+                if (i.electrolyzer_lifetime <= 0 || i.pv_lifetime <= 0) return { max_daily_prod: 0, total_prod: 0, levelized_cost: 0, levelized_cost_capex_pct: 0, levelized_cost_opex_pct: 0, capex_per_kg: 0, opex_per_kg: 0 };
 
-                const max_daily_prod = ch4_energy_demand.value > 0 ? (i.pv_power * i.max_daily_pv_yield * 1000 / ch4_energy_demand.value) * i.h2_stoich : 0;
-                
+                const total_capex = i.electrolyzer_capex * i.pv_power;
                 const avg_annual_electricity = pv.value.total_electricity / i.pv_lifetime;
                 const total_prod_lifetime_scaled = ch4_energy_demand.value > 0 ? (avg_annual_electricity * i.electrolyzer_lifetime / ch4_energy_demand.value) * i.h2_stoich : 0;
 
                 const total_opex = pv.value.lcoe_dc * i.h2_energy_demand * total_prod_lifetime_scaled;
-
                 const levelized_cost = total_prod_lifetime_scaled > 0 ? (total_capex + total_opex) / total_prod_lifetime_scaled : 0;
-                
-                const lcoe_capex_contrib = total_prod_lifetime_scaled > 0 ? total_capex / total_prod_lifetime_scaled : 0;
-                const lcoe_opex_contrib = total_prod_lifetime_scaled > 0 ? total_opex / total_prod_lifetime_scaled : 0;
-                const levelized_cost_capex_pct = levelized_cost > 0 ? (lcoe_capex_contrib / levelized_cost) * 100 : 0;
-                const levelized_cost_opex_pct = levelized_cost > 0 ? (lcoe_opex_contrib / levelized_cost) * 100 : 0;
+
+                const capex_per_kg = total_prod_lifetime_scaled > 0 ? total_capex / total_prod_lifetime_scaled : 0;
+                const opex_per_kg = total_prod_lifetime_scaled > 0 ? total_opex / total_prod_lifetime_scaled : 0;
                 
                 return {
-                    max_daily_prod,
                     total_prod: total_prod_lifetime_scaled,
                     levelized_cost,
-                    levelized_cost_capex_pct,
-                    levelized_cost_opex_pct
+                    levelized_cost_capex_pct: levelized_cost > 0 ? (capex_per_kg / levelized_cost) * 100 : 0,
+                    levelized_cost_opex_pct: levelized_cost > 0 ? (opex_per_kg / levelized_cost) * 100 : 0,
+                    max_daily_prod: ch4_energy_demand.value > 0 ? (i.pv_power * i.max_daily_pv_yield * 1000 / ch4_energy_demand.value) * i.h2_stoich : 0,
+                    capex_per_kg,
+                    opex_per_kg
                 };
             });
 
-            // 4. 🔥 Sabatier Reactor Unit
             const ch4 = computed(() => {
                 const i = inputs.value;
-                const total_capex = i.reactor_capex * i.pv_power;
-
-                const hourly_max = ch4_energy_demand.value > 0 ? (i.pv_power * 1000 / ch4_energy_demand.value) : 0;
+                if (i.reactor_lifetime <= 0 || i.pv_lifetime <= 0) return { hourly_max: 0, total_prod_kg: 0, levelized_capex_cost: 0 };
                 
                 const avg_annual_electricity = pv.value.total_electricity / i.pv_lifetime;
                 const total_prod_nm3_lifetime_scaled = ch4_energy_demand.value > 0 ? (avg_annual_electricity * i.reactor_lifetime / ch4_energy_demand.value) : 0;
                 
-                const total_prod_kg = total_prod_nm3_lifetime_scaled * 0.716;
-
-                const levelized_capex_cost = total_prod_nm3_lifetime_scaled > 0 ? total_capex / total_prod_nm3_lifetime_scaled : 0;
-                
-                return { hourly_max, total_prod_kg, levelized_capex_cost };
+                return {
+                    hourly_max: ch4_energy_demand.value > 0 ? (i.pv_power * 1000 / ch4_energy_demand.value) : 0,
+                    total_prod_kg: total_prod_nm3_lifetime_scaled * 0.716,
+                    levelized_capex_cost: total_prod_nm3_lifetime_scaled > 0 ? (i.reactor_capex * i.pv_power) / total_prod_nm3_lifetime_scaled : 0
+                };
+            });
+            
+            // New computed property for chart data
+            const costBreakdown = computed(() => {
+                const i = inputs.value;
+                const h2_capex = h2.value.capex_per_kg * i.h2_stoich;
+                const h2_opex = h2.value.opex_per_kg * i.h2_stoich;
+                const co2_capex = co2.value.capex_per_kg * i.co2_stoich;
+                const co2_opex = co2.value.opex_per_kg * i.co2_stoich;
+                const reactor_capex = ch4.value.levelized_capex_cost;
+                return { h2_capex, h2_opex, co2_capex, co2_opex, reactor_capex };
             });
 
-            // 5. 📊 Overall Result
             const overall = computed(() => {
                 const i = inputs.value;
-                
-                const ch4_max_daily = ch4_energy_demand.value > 0 ? (i.pv_power * i.max_daily_pv_yield * 1000 / ch4_energy_demand.value) : 0;
-                
-                // Note: The prompt's formula for Levelized_CH4_cost is ambiguous as it sums costs over different lifetimes.
-                // A more robust method sums costs per unit of final product.
-                // Levelized H2 cost * H2 needed + Levelized CO2 cost * CO2 needed + Levelized Reactor cost
-                const levelized_ch4_cost = (h2.value.levelized_cost * i.h2_stoich) + (co2.value.levelized_cost * i.co2_stoich) + ch4.value.levelized_capex_cost;
+                const breakdown = costBreakdown.value;
+                const levelized_ch4_cost = breakdown.h2_capex + breakdown.h2_opex + breakdown.co2_capex + breakdown.co2_opex + breakdown.reactor_capex;
 
-                const cost_per_kwh = levelized_ch4_cost / 10; // Assuming 1 Nm³ CH4 ≈ 10 kWh
-                
-                const ch4_energy_contrib_h2 = ch4_energy_demand.value > 0 ? (i.h2_stoich * i.h2_energy_demand / ch4_energy_demand.value) * 100 : 0;
-                const ch4_energy_contrib_co2 = ch4_energy_demand.value > 0 ? (i.co2_stoich * i.co2_energy_demand / ch4_energy_demand.value) * 100 : 0;
-                
                 const electricity_per_m2_year = (pv.value.land_area > 0 && i.pv_lifetime > 0) ? pv.value.total_electricity / (pv.value.land_area * i.pv_lifetime) : 0;
                 const nm3_ch4_per_m2_year = ch4_energy_demand.value > 0 ? electricity_per_m2_year / ch4_energy_demand.value : 0;
-                const kwh_ch4_per_m2_year = nm3_ch4_per_m2_year * 10;
                 
-                // Efficiency = Energy Out / Energy In
-                const efficiency = ch4_energy_demand.value > 0 ? (10 / ch4_energy_demand.value) * 100 : 0;
-
                 return {
                     levelized_ch4_cost,
-                    cost_per_kwh,
-                    ch4_max_daily,
+                    cost_per_kwh: levelized_ch4_cost / 10,
+                    ch4_max_daily: ch4_energy_demand.value > 0 ? (i.pv_power * i.max_daily_pv_yield * 1000 / ch4_energy_demand.value) : 0,
                     ch4_energy_demand: ch4_energy_demand.value,
-                    ch4_energy_contrib_h2,
-                    ch4_energy_contrib_co2,
+                    ch4_energy_contrib_h2: ch4_energy_demand.value > 0 ? (i.h2_stoich * i.h2_energy_demand / ch4_energy_demand.value) * 100 : 0,
+                    ch4_energy_contrib_co2: ch4_energy_demand.value > 0 ? (i.co2_stoich * i.co2_energy_demand / ch4_energy_demand.value) * 100 : 0,
+                    efficiency: ch4_energy_demand.value > 0 ? (10 / ch4_energy_demand.value) * 100 : 0,
                     nm3_ch4_per_m2_year,
-                    kwh_ch4_per_m2_year,
-                    efficiency
+                    kwh_ch4_per_m2_year: nm3_ch4_per_m2_year * 10
                 };
             });
 
-            // --- UTILITY FUNCTIONS ---
             const formatNumber = (num, decimals = 2) => {
-                if (isNaN(num) || !isFinite(num)) {
-                    return "N/A";
+                if (isNaN(num) || !isFinite(num)) return "N/A";
+                return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+            };
+            
+            // Chart initialization and update logic
+            onMounted(() => {
+                if (pieChartCanvas.value) {
+                    const ctx = pieChartCanvas.value.getContext('2d');
+                    chartInstance = new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: ['H₂ CAPEX', 'H₂ OPEX', 'CO₂ CAPEX', 'CO₂ OPEX', 'Reactor CAPEX'],
+                            datasets: [{
+                                label: 'Cost Contribution (€/Nm³)',
+                                data: Object.values(costBreakdown.value),
+                                backgroundColor: [ '#00796b', '#80cbc4', '#7b1fa2', '#ce93d8', '#f57c00' ],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'top' },
+                                title: { display: true, text: 'CH₄ Cost Contribution (€/Nm³)' }
+                            }
+                        }
+                    });
                 }
-                return num.toLocaleString('en-US', {
-                    minimumFractionDigits: decimals,
-                    maximumFractionDigits: decimals,
-                });
-            };
+            });
 
-            return {
-                inputs,
-                resetToDefaults,
-                formatNumber,
-                pv,
-                co2,
-                h2,
-                ch4,
-                overall
-            };
+            watch(costBreakdown, (newData) => {
+                if (chartInstance) {
+                    chartInstance.data.datasets[0].data = Object.values(newData);
+                    chartInstance.update();
+                }
+            });
+            
+            onBeforeUnmount(() => {
+                if(chartInstance) {
+                    chartInstance.destroy();
+                }
+            });
+
+            return { inputs, resetToDefaults, formatNumber, pv, co2, h2, ch4, overall, pieChartCanvas };
         }
     }).mount('#app');
 </script>
+
+</body>
+</html>
 
 </body>
 </html>
