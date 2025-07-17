@@ -49,6 +49,7 @@
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 15px;
             margin-bottom: 10px;
+            width: 100%;
         }
 
         h1 {
@@ -190,8 +191,9 @@
         .chart-container {
             position: relative;
             margin: 20px auto 10px auto;
-            height: 260px;
-            width: 260px;
+            max-width: 280px;
+            width: 100%;
+            aspect-ratio: 1 / 1;
         }
 
         button {
@@ -218,6 +220,8 @@
             display: flex;
             justify-content: space-between;
             width: 100%;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         
         footer a {
@@ -227,6 +231,33 @@
         
         footer a:hover {
             text-decoration: underline;
+        }
+
+        /* --- MOBILE RESPONSIVE STYLES --- */
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr; /* Stack columns */
+            }
+            .column-inputs { order: 1; }
+            .column-outputs { order: 2; } /* Reorder for better UX */
+            .column-diagram { order: 3; }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            #app {
+                padding: 15px;
+            }
+            h1 {
+                font-size: 20px;
+            }
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
         }
     </style>
 </head>
@@ -239,8 +270,8 @@
     </header>
 
     <div class="main-content">
-        <!-- INPUTS COLUMN -->
-        <div class="column">
+        <!-- Add classes to columns for reordering on mobile -->
+        <div class="column column-inputs">
             <div class="input-section">
                 <h3>⚡ Utility Solar PV</h3>
                 <div class="input-group">
@@ -384,8 +415,7 @@
             </div>
         </div>
 
-        <!-- VISUAL DIAGRAM COLUMN -->
-        <div class="column">
+        <div class="column column-diagram">
             <div class="diagram">
                 <svg viewBox="0 0 400 650" xmlns="http://www.w3.org/2000/svg">
                     <defs>
@@ -393,15 +423,12 @@
                             <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
                         </marker>
                     </defs>
-                    <!-- Solar PV -->
                     <g>
                         <rect x="100" y="20" width="200" height="80" rx="10" fill="#f0f7ff" stroke="#007bff" stroke-width="2"/>
                         <text x="200" y="60" text-anchor="middle" font-size="18" font-weight="bold">☀️ Solar PV</text>
                         <text x="200" y="80" text-anchor="middle" font-size="14" fill="#555">Electricity</text>
                     </g>
                     <line x1="200" y1="100" x2="200" y2="140" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-                    
-                    <!-- Electrolysis & DAC -->
                     <g>
                          <text x="50" y="160" text-anchor="middle" font-size="16">💧 Water</text>
                         <line x1="60" y1="180" x2="115" y2="200" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
@@ -416,23 +443,18 @@
                         <text x="300" y="235" text-anchor="middle" font-size="16" font-weight="bold">Direct Air Capture</text>
                         <text x="300" y="255" text-anchor="middle" font-size="14" fill="#555">CO₂ Capture</text>
                     </g>
-                    
                     <line x1="100" y1="280" x2="100" y2="330" stroke="#333" stroke-width="2" />
                     <line x1="300" y1="280" x2="300" y2="330" stroke="#333" stroke-width="2" />
                     <line x1="100" y1="330" x2="180" y2="380" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
                     <line x1="300" y1="330" x2="220" y2="380" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
                     <text x="100" y="310" text-anchor="middle" font-size="16" fill="#00796b">H₂</text>
                     <text x="300" y="310" text-anchor="middle" font-size="16" fill="#7b1fa2">CO₂</text>
-
-                    <!-- Sabatier Reactor -->
                     <g>
                         <rect x="100" y="380" width="200" height="80" rx="10" fill="#fff3e0" stroke="#f57c00" stroke-width="2"/>
                         <text x="200" y="415" text-anchor="middle" font-size="18" font-weight="bold">🔥 Sabatier Reactor</text>
                         <text x="200" y="435" text-anchor="middle" font-size="14" fill="#555">Methanation</text>
                     </g>
                      <line x1="200" y1="460" x2="200" y2="500" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
-
-                    <!-- Final Product -->
                     <g>
                         <rect x="100" y="500" width="200" height="80" rx="10" fill="#dcedc8" stroke="#689f38" stroke-width="2"/>
                         <text x="200" y="535" text-anchor="middle" font-size="18" font-weight="bold">Synthetic Methane</text>
@@ -442,8 +464,7 @@
             </div>
         </div>
 
-        <!-- OUTPUTS COLUMN -->
-        <div class="column">
+        <div class="column column-outputs">
             <div class="output-section overall-results">
                 <h3>📊 Overall Result</h3>
                 <div class="output-grid">
@@ -469,7 +490,6 @@
                     <span class="output-grid-label"></span>
                     <span class="output-grid-value">{{ formatNumber(overall.kwh_ch4_per_m2_year, 2) }} kWh/m²</span>
                 </div>
-                <!-- PIE CHART ADDED HERE -->
                 <div class="chart-container">
                     <canvas ref="pieChartCanvas"></canvas>
                 </div>
@@ -557,7 +577,7 @@
                 max_daily_pv_yield: 6.5,
                 pv_capacity_density: 0.21,
                 pv_capex: 300,
-                pv_opex: 3,
+                pv_opex: 10,
                 degradation_rate: 0.4,
                 pv_lifetime: 20,
                 dac_capex: 100000,
@@ -579,8 +599,6 @@
             const resetToDefaults = () => {
                 inputs.value = { ...defaults };
             };
-
-            // --- COMPUTED PROPERTIES FOR CALCULATIONS ---
 
             const pv = computed(() => {
                 const i = inputs.value;
@@ -670,7 +688,6 @@
                 };
             });
             
-            // New computed property for chart data
             const costBreakdown = computed(() => {
                 const i = inputs.value;
                 const h2_capex = h2.value.capex_per_kg * i.h2_stoich;
@@ -707,7 +724,6 @@
                 return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
             };
             
-            // Chart initialization and update logic
             onMounted(() => {
                 if (pieChartCanvas.value) {
                     const ctx = pieChartCanvas.value.getContext('2d');
@@ -751,9 +767,6 @@
         }
     }).mount('#app');
 </script>
-
-</body>
-</html>
 
 </body>
 </html>
