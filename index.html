@@ -50,6 +50,15 @@
             padding-bottom: 15px;
             margin-bottom: 10px;
             width: 100%;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .header-controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
         h1 {
@@ -113,6 +122,15 @@
         
         .input-group label a:hover {
             text-decoration: underline;
+        }
+
+        .info-text {
+            font-size: 11px;
+            font-style: italic;
+            color: var(--secondary-color);
+            font-weight: 400;
+            margin-top: -2px;
+            margin-bottom: 8px;
         }
 
         .input-row {
@@ -246,6 +264,33 @@
         button:hover {
             background-color: #5a6268;
         }
+        
+        .unit-toggle {
+            display: flex;
+            border: 1px solid var(--secondary-color);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .unit-toggle button {
+            background-color: white;
+            color: var(--secondary-color);
+            padding: 8px 15px;
+            border: none;
+            border-radius: 0;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .unit-toggle button:not(:last-child) {
+            border-right: 1px solid var(--secondary-color);
+        }
+        .unit-toggle button.active {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        .unit-toggle button:hover:not(.active) {
+            background-color: #e9ecef;
+        }
 
         footer {
             margin-top: 20px;
@@ -283,6 +328,7 @@
             #app { padding: 15px; }
             h1 { font-size: 20px; }
             header { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .header-controls { flex-direction: column; align-items: flex-start; gap: 15px; }
             .cost-visualization { flex-direction: column; }
             .chart-container { max-width: 220px; }
         }
@@ -293,7 +339,13 @@
 <div id="app">
     <header>
         <h1>PV-to-Methane Technoeconomic Calculator</h1>
-        <button @click="resetToDefaults">Reset to Defaults</button>
+        <div class="header-controls">
+            <div class="unit-toggle">
+                <button :class="{ active: unitSystem === 'SI' }" @click="setUnitSystem('SI')">SI Units (€)</button>
+                <button :class="{ active: unitSystem === 'US' }" @click="setUnitSystem('US')">US Units ($)</button>
+            </div>
+            <button @click="resetToDefaults">Reset to Defaults</button>
+        </div>
     </header>
 
     <div class="main-content">
@@ -304,35 +356,49 @@
                 <div class="input-group"><label>PV Yield (kWh/kWp/yr) <a href="https://globalsolaratlas.info/map?c=37.327854,-5.169067,11&s=37.327661,-5.169067&m=site&pv=ground,180,8,1000" target="_blank">(Source)</a></label><div class="input-row"><input type="range" v-model.number="inputs.annual_pv_yield" min="0" max="5000" step="10"><input type="number" v-model.number="inputs.annual_pv_yield" min="0" max="5000" step="10"></div></div>
                 <div class="input-group"><label>Max Daily PV Yield (kWh/kWp/day)</label><div class="input-row"><input type="range" v-model.number="inputs.max_daily_pv_yield" min="0" max="10" step="0.1"><input type="number" v-model.number="inputs.max_daily_pv_yield" min="0" max="10" step="0.1"></div></div>
                 <div class="input-group"><label>PV Capacity Density (kWp/m²) <a href="https://www.jurchen-technology.de/wp-content/uploads/2020/06/JT_PEG_overview_de_single_NEW_6-seiiter_small.pdf" target="_blank">(Source)</a></label><div class="input-row"><input type="range" v-model.number="inputs.pv_capacity_density" min="0" max="0.5" step="0.01"><input type="number" v-model.number="inputs.pv_capacity_density" min="0" max="0.5" step="0.01"></div></div>
-                <div class="input-group"><label>PV CAPEX (€/kW)</label><div class="input-row"><input type="range" v-model.number="inputs.pv_capex" min="0" max="1000" step="10"><input type="number" v-model.number="inputs.pv_capex" min="0" max="1000" step="10"></div></div>
-                <div class="input-group"><label>PV OPEX (€/kW/yr)</label><div class="input-row"><input type="range" v-model.number="inputs.pv_opex" min="0" max="30" step="0.5"><input type="number" v-model.number="inputs.pv_opex" min="0" max="30" step="0.5"></div></div>
+                <div class="input-group"><label>PV CAPEX ({{ currencySymbol }}/kW)</label><div class="input-row"><input type="range" v-model.number="inputs.pv_capex" :min="0" :max="unitSystem === 'SI' ? 1000 : 1100" step="10"><input type="number" v-model.number="inputs.pv_capex" :min="0" :max="unitSystem === 'SI' ? 1000 : 1100" step="10"></div></div>
+                <div class="input-group"><label>PV OPEX ({{ currencySymbol }}/kW/yr)</label><div class="input-row"><input type="range" v-model.number="inputs.pv_opex" :min="0" :max="unitSystem === 'SI' ? 30 : 33" step="0.5"><input type="number" v-model.number="inputs.pv_opex" :min="0" :max="unitSystem === 'SI' ? 30 : 33" step="0.5"></div></div>
                 <div class="input-group"><label>PV Degradation Rate (%/yr)</label><div class="input-row"><input type="range" v-model.number="inputs.degradation_rate" min="0" max="1" step="0.05"><input type="number" v-model.number="inputs.degradation_rate" min="0" max="1" step="0.05"></div></div>
                 <div class="input-group"><label>PV Lifetime (years)</label><div class="input-row"><input type="range" v-model.number="inputs.pv_lifetime" min="1" max="30" step="1"><input type="number" v-model.number="inputs.pv_lifetime" min="1" max="30" step="1"></div></div>
             </div>
             <div class="input-section">
                 <h3>🌫️ CO₂ Direct Air Capture (DAC)</h3>
-                <div class="input-group"><label>DAC CAPEX (€/MWp DC PV)</label><div class="input-row"><input type="range" v-model.number="inputs.dac_capex" min="0" max="500000" step="1000"><input type="number" v-model.number="inputs.dac_capex" min="0" max="500000" step="1000"></div></div>
+                <div class="input-group"><label>DAC CAPEX ({{ currencySymbol }}/MWp DC PV)</label><div class="input-row"><input type="range" v-model.number="inputs.dac_capex" :min="0" :max="unitSystem === 'SI' ? 500000 : 550000" step="1000"><input type="number" v-model.number="inputs.dac_capex" :min="0" :max="unitSystem === 'SI' ? 500000 : 550000" step="1000"></div></div>
                 <div class="input-group"><label>CO₂ Capture Energy (kWh/kg) <a href="https://terraformindustries.wordpress.com/2023/01/09/terraform-industries-whitepaper-2-0/" target="_blank">(Source)</a></label><div class="input-row"><input type="range" v-model.number="inputs.co2_energy_demand" min="0" max="10" step="0.05"><input type="number" v-model.number="inputs.co2_energy_demand" min="0" max="10" step="0.05"></div></div>
                 <div class="input-group"><label>DAC Lifetime (years)</label><div class="input-row"><input type="range" v-model.number="inputs.dac_lifetime" min="1" max="30" step="1"><input type="number" v-model.number="inputs.dac_lifetime" min="1" max="30" step="1"></div></div>
             </div>
             <div class="input-section">
                 <h3>💧 Water Electrolysis</h3>
-                <div class="input-group"><label>Electrolyzer CAPEX (€/MWp DC PV)</label><div class="input-row"><input type="range" v-model.number="inputs.electrolyzer_capex" min="0" max="500000" step="1000"><input type="number" v-model.number="inputs.electrolyzer_capex" min="0" max="500000" step="1000"></div></div>
+                <div class="input-group"><label>Electrolyzer CAPEX ({{ currencySymbol }}/MWp DC PV)</label><div class="input-row"><input type="range" v-model.number="inputs.electrolyzer_capex" :min="0" :max="unitSystem === 'SI' ? 500000 : 550000" step="1000"><input type="number" v-model.number="inputs.electrolyzer_capex" :min="0" :max="unitSystem === 'SI' ? 500000 : 550000" step="1000"></div></div>
                 <div class="input-group"><label>H₂ Production Energy (kWh/kg)</label><div class="input-row"><input type="range" v-model.number="inputs.h2_energy_demand" min="0" max="100" step="1"><input type="number" v-model.number="inputs.h2_energy_demand" min="0" max="100" step="1"></div></div>
                 <div class="input-group"><label>Electrolyzer Lifetime (years)</label><div class="input-row"><input type="range" v-model.number="inputs.electrolyzer_lifetime" min="1" max="30" step="1"><input type="number" v-model.number="inputs.electrolyzer_lifetime" min="1" max="30" step="1"></div></div>
             </div>
             <div class="input-section">
                 <h3>🔥 Sabatier Reactor</h3>
-                <div class="input-group"><label>Reactor CAPEX (€/MWp DC PV)</label><div class="input-row"><input type="range" v-model.number="inputs.reactor_capex" min="0" max="500000" step="1000"><input type="number" v-model.number="inputs.reactor_capex" min="0" max="500000" step="1000"></div></div>
-                <div class="input-group"><label>H₂ Stoichiometry (kg H₂/Nm³ CH₄)</label><div class="input-row"><input type="range" v-model.number="inputs.h2_stoich" min="0.36" max="1.0" step="0.01"><input type="number" v-model.number="inputs.h2_stoich" min="0.36" max="1.0" step="0.01"></div></div>
-                <div class="input-group"><label>CO₂ Stoichiometry (kg CO₂/Nm³ CH₄)</label><div class="input-row"><input type="range" v-model.number="inputs.co2_stoich" min="1.96" max="3.0" step="0.01"><input type="number" v-model.number="inputs.co2_stoich" min="1.96" max="3.0" step="0.01"></div></div>
+                <div class="input-group"><label>Reactor CAPEX ({{ currencySymbol }}/MWp DC PV)</label><div class="input-row"><input type="range" v-model.number="inputs.reactor_capex" :min="0" :max="unitSystem === 'SI' ? 500000 : 550000" step="1000"><input type="number" v-model.number="inputs.reactor_capex" :min="0" :max="unitSystem === 'SI' ? 500000 : 550000" step="1000"></div></div>
+                <div class="input-group">
+                    <label>H₂ Stoichiometry (kg H₂/Nm³ CH₄)</label>
+                    <div class="info-text">Minimum stoichiometric requirement: 0.36 kg H₂/Nm³ CH₄</div>
+                    <div class="input-row">
+                        <input type="range" v-model.number="inputs.h2_stoich" min="0.36" max="1.0" step="0.01">
+                        <input type="number" v-model.number="inputs.h2_stoich" min="0.36" max="1.0" step="0.01">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>CO₂ Stoichiometry (kg CO₂/Nm³ CH₄)</label>
+                    <div class="info-text">Minimum stoichiometric requirement: 1.96 kg CO₂/Nm³ CH₄</div>
+                    <div class="input-row">
+                        <input type="range" v-model.number="inputs.co2_stoich" min="1.96" max="3.0" step="0.01">
+                        <input type="number" v-model.number="inputs.co2_stoich" min="1.96" max="3.0" step="0.01">
+                    </div>
+                </div>
                 <div class="input-group"><label>Reactor Lifetime (years)</label><div class="input-row"><input type="range" v-model.number="inputs.reactor_lifetime" min="1" max="30" step="1"><input type="number" v-model.number="inputs.reactor_lifetime" min="1" max="30" step="1"></div></div>
             </div>
         </div>
 
         <div class="column column-diagram">
             <div class="diagram">
-                <svg viewBox="0 0 400 650" xmlns="http://www.w3.org/2000/svg">
+                 <svg viewBox="0 0 400 650" xmlns="http://www.w3.org/2000/svg">
                     <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#333" /></marker></defs>
                     <g><rect x="100" y="20" width="200" height="80" rx="10" fill="#f0f7ff" stroke="#007bff" stroke-width="2"/><text x="200" y="60" text-anchor="middle" font-size="18" font-weight="bold">☀️ Solar PV</text><text x="200" y="80" text-anchor="middle" font-size="14" fill="#555">Electricity</text></g>
                     <line x1="200" y1="100" x2="200" y2="150" stroke="#333" stroke-width="2"/><line x1="100" y1="150" x2="300" y2="150" stroke="#333" stroke-width="2"/><line x1="100" y1="150" x2="100" y2="190" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/><line x1="300" y1="150" x2="300" y2="190" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
@@ -350,50 +416,68 @@
                 <h3>📊 Overall Result</h3>
                 <div class="output-grid">
                     <span class="output-grid-label">Levelized Cost of CH₄</span>
-                    <span class="output-grid-value">{{ formatNumber(overall.levelized_ch4_cost, 3) }} €/Nm³</span>
+                    <span class="output-grid-value" v-if="unitSystem === 'SI'">{{ formatNumber(overall.levelized_ch4_cost, 2) }} {{ currencySymbol }}/Nm³</span>
+                    <span class="output-grid-value" v-else>{{ formatNumber(overall.levelized_ch4_cost / CONVERSIONS.NM3_TO_KCF, 2) }} {{ currencySymbol }}/kcf</span>
+                    
                     <span class="output-grid-label"></span>
-                    <span class="output-grid-value">{{ formatNumber(overall.cost_per_MWh, 3) }} €/MWh</span>
+                    <span class="output-grid-value" v-if="unitSystem === 'SI'">{{ formatNumber(overall.cost_per_MWh, 2) }} {{ currencySymbol }}/MWh</span>
+                    <span class="output-grid-value" v-else>{{ formatNumber(overall.cost_per_MWh / CONVERSIONS.MWH_TO_MMBTU, 2) }} {{ currencySymbol }}/MMBTU</span>
+                    
                     <span class="output-grid-label">Max. Daily CH₄ Production</span>
-                    <span class="output-grid-value">{{ formatNumber(overall.ch4_max_daily, 0) }} Nm³/day</span>
+                    <span class="output-grid-value" v-if="unitSystem === 'SI'">{{ formatNumber(overall.ch4_max_daily, 2) }} Nm³/day</span>
+                    <span class="output-grid-value" v-else>{{ formatNumber(overall.ch4_max_daily * CONVERSIONS.NM3_TO_MCF, 2) }} Mcf/day</span>
+
                     <span class="output-grid-label">Energy Consumption for CH₄</span>
-                    <span class="output-grid-value">{{ formatNumber(overall.ch4_energy_demand, 2) }} kWh/Nm³</span>
+                    <span class="output-grid-value" v-if="unitSystem === 'SI'">{{ formatNumber(overall.ch4_energy_demand, 2) }} kWh/Nm³</span>
+                    <span class="output-grid-value" v-else>{{ formatNumber(overall.ch4_energy_demand * (CONVERSIONS.KWH_TO_BTU / CONVERSIONS.NM3_TO_SCF), 0) }} BTU/scf</span>
+                    
                     <span class="output-grid-label"></span>
                     <span class="contribution"> H₂: {{formatNumber(overall.ch4_energy_contrib_h2, 1)}}%, CO₂: {{formatNumber(overall.ch4_energy_contrib_co2, 1)}}% </span>
+                    
                     <span class="output-grid-label">Overall Efficiency (PV electricity to CH₄)</span>
                     <span class="output-grid-value">{{ formatNumber(overall.efficiency, 2) }} %</span>
-                    <span class="output-grid-label">Annual CH₄ per m² Land</span>
-                    <span class="output-grid-value">{{ formatNumber(overall.nm3_ch4_per_m2_year, 2) }} Nm³/m²</span>
+                    
+                    <span class="output-grid-label">Annual CH₄ per Land Area</span>
+                    <span class="output-grid-value" v-if="unitSystem === 'SI'">{{ formatNumber(overall.nm3_ch4_per_m2_year, 2) }} Nm³/m²</span>
+                    <span class="output-grid-value" v-else>{{ formatNumber(overall.nm3_ch4_per_m2_year * (CONVERSIONS.NM3_TO_SCF / CONVERSIONS.M2_TO_FT2), 2) }} scf/ft²</span>
+                    
                     <span class="output-grid-label"></span>
-                    <span class="output-grid-value">{{ formatNumber(overall.kwh_ch4_per_m2_year, 2) }} kWh/m²</span>
+                    <span class="output-grid-value" v-if="unitSystem === 'SI'">{{ formatNumber(overall.kwh_ch4_per_m2_year, 2) }} kWh/m²</span>
+                    <span class="output-grid-value" v-else>{{ formatNumber(overall.kwh_ch4_per_m2_year * (CONVERSIONS.KWH_TO_BTU / CONVERSIONS.M2_TO_FT2), 2) }} BTU/ft²</span>
                 </div>
                 
-                <!-- === UPDATED VISUALIZATION SECTION === -->
-                <h4 style="text-align: center; margin-bottom: 5px; margin-top: 25px; font-size: 16px; color: #555;">CH₄ Cost Contribution (€/MWh)</h4>
+                <h4 style="text-align: center; margin-bottom: 5px; margin-top: 25px; font-size: 16px; color: #555;">
+                    CH₄ Cost Contribution ({{ currencySymbol }}/<span v-if="unitSystem === 'SI'">MWh</span><span v-else>MMBTU</span>)
+                </h4>
                 <div class="cost-visualization">
                     <div class="chart-container">
                         <canvas ref="pieChartCanvas"></canvas>
                     </div>
                     <div class="legend-container">
-                        <div v-for="item in costBreakdownForDisplay" :key="item.label" class="legend-item">
+                        <div v-for="item in costBreakdownConverted" :key="item.label" class="legend-item">
                             <span class="legend-swatch" :style="{ backgroundColor: item.color }"></span>
                             <span class="legend-label">{{ item.label }}</span>
-                            <span class="legend-value">{{ formatNumber(item.value * 100, 2) }}</span>
+                            <span class="legend-value">{{ formatNumber(item.displayValue, 2) }}</span>
                         </div>
                     </div>
                 </div>
 
             </div>
             <div class="output-section">
-                <h3>⚡ PV Outputs</h3><div class="output-grid"><span class="output-grid-label">LCOE for PV DC</span><span class="output-grid-value">{{ formatNumber(pv.lcoe_dc, 4) }} €/kWh</span><span class="output-grid-label">Total PV CAPEX</span><span class="output-grid-value">{{ formatNumber(pv.total_capex, 0) }} €</span><span class="output-grid-label">Total PV OPEX (Lifetime)</span><span class="output-grid-value">{{ formatNumber(pv.total_opex, 0) }} €</span><span class="output-grid-label">Total Electricity (Lifetime)</span><span class="output-grid-value">{{ formatNumber(pv.total_electricity / 1e6, 2) }} GWh</span><span class="output-grid-label">Total Land Area Needed</span><span class="output-grid-value">{{ formatNumber(pv.land_area, 0) }} m²</span></div>
+                <h3>⚡ PV Outputs</h3><div class="output-grid"><span class="output-grid-label">LCOE for PV DC</span><span class="output-grid-value">{{ formatNumber(pv.lcoe_dc, 4) }} {{ currencySymbol }}/kWh</span><span class="output-grid-label">Total PV CAPEX</span><span class="output-grid-value">{{ formatNumber(pv.total_capex, 0) }} {{ currencySymbol }}</span><span class="output-grid-label">Total PV OPEX (Lifetime)</span><span class="output-grid-value">{{ formatNumber(pv.total_opex, 0) }} {{ currencySymbol }}</span><span class="output-grid-label">Total Electricity (Lifetime)</span><span class="output-grid-value">{{ formatNumber(pv.total_electricity / 1e6, 2) }} GWh</span>
+                <span class="output-grid-label">Total Land Area Needed</span>
+                <span class="output-grid-value" v-if="unitSystem === 'SI'">{{ formatNumber(pv.land_area, 0) }} m²</span>
+                <span class="output-grid-value" v-else>{{ formatNumber(pv.land_area * CONVERSIONS.M2_TO_ACRES, 2) }} acres</span>
+                </div>
             </div>
             <div class="output-section">
-                <h3>💧 H₂ Electrolysis Outputs</h3><div class="output-grid"><span class="output-grid-label">Levelized H₂ Cost</span><span class="output-grid-value">{{ formatNumber(h2.levelized_cost, 2) }} €/kg</span><span class="output-grid-label"></span><span class="contribution">CAPEX: {{formatNumber(h2.levelized_cost_capex_pct,1)}}%, OPEX: {{formatNumber(h2.levelized_cost_opex_pct,1)}}%</span><span class="output-grid-label">Max. Daily H₂ Production</span><span class="output-grid-value">{{ formatNumber(h2.max_daily_prod, 0) }} kg/day</span><span class="output-grid-label">Total H₂ Produced (Lifetime)</span><span class="output-grid-value">{{ formatNumber(h2.total_prod / 1000, 1) }} t</span></div>
+                <h3>💧 H₂ Electrolysis Outputs</h3><div class="output-grid"><span class="output-grid-label">Levelized H₂ Cost</span><span class="output-grid-value">{{ formatNumber(h2.levelized_cost, 2) }} {{ currencySymbol }}/kg</span><span class="output-grid-label"></span><span class="contribution">CAPEX: {{formatNumber(h2.levelized_cost_capex_pct,1)}}%, OPEX: {{formatNumber(h2.levelized_cost_opex_pct,1)}}%</span><span class="output-grid-label">Max. Daily H₂ Production</span><span class="output-grid-value">{{ formatNumber(h2.max_daily_prod, 0) }} kg/day</span><span class="output-grid-label">Total H₂ Produced (Lifetime)</span><span class="output-grid-value">{{ formatNumber(h2.total_prod / 1000, 1) }} t</span></div>
             </div>
             <div class="output-section">
-                <h3>🌫️ CO₂ DAC Outputs</h3><div class="output-grid"><span class="output-grid-label">Levelized CO₂ Cost</span><span class="output-grid-value">{{ formatNumber(co2.levelized_cost, 2) }} €/kg</span><span class="output-grid-label"></span><span class="contribution">CAPEX: {{formatNumber(co2.levelized_cost_capex_pct,1)}}%, OPEX: {{formatNumber(co2.levelized_cost_opex_pct,1)}}%</span><span class="output-grid-label">Max. Daily CO₂ Capture</span><span class="output-grid-value">{{ formatNumber(co2.max_daily_prod, 0) }} kg/day</span><span class="output-grid-label">Total CO₂ Captured (Lifetime)</span><span class="output-grid-value">{{ formatNumber(co2.total_prod / 1000, 1) }} t</span></div>
+                <h3>🌫️ CO₂ DAC Outputs</h3><div class="output-grid"><span class="output-grid-label">Levelized CO₂ Cost</span><span class="output-grid-value">{{ formatNumber(co2.levelized_cost, 2) }} {{ currencySymbol }}/kg</span><span class="output-grid-label"></span><span class="contribution">CAPEX: {{formatNumber(co2.levelized_cost_capex_pct,1)}}%, OPEX: {{formatNumber(co2.levelized_cost_opex_pct,1)}}%</span><span class="output-grid-label">Max. Daily CO₂ Capture</span><span class="output-grid-value">{{ formatNumber(co2.max_daily_prod, 0) }} kg/day</span><span class="output-grid-label">Total CO₂ Captured (Lifetime)</span><span class="output-grid-value">{{ formatNumber(co2.total_prod / 1000, 1) }} t</span></div>
             </div>
             <div class="output-section">
-                <h3>🔥 Sabatier Reactor Outputs</h3><div class="output-grid"><span class="output-grid-label">Levelized Reactor CAPEX Cost</span><span class="output-grid-value">{{ formatNumber(ch4.levelized_capex_cost, 3) }} €/Nm³</span><span class="output-grid-label">Max CH₄ Production Rate</span><span class="output-grid-value">{{ formatNumber(ch4.hourly_max, 1) }} Nm³/h</span><span class="output-grid-label">Total CH₄ Produced (Lifetime)</span><span class="output-grid-value">{{ formatNumber(ch4.total_prod_Nm3, 0) }} Nm³</span></div>
+                <h3>🔥 Sabatier Reactor Outputs</h3><div class="output-grid"><span class="output-grid-label">Levelized Reactor CAPEX Cost</span><span class="output-grid-value">{{ formatNumber(ch4.levelized_capex_cost, 3) }} {{ currencySymbol }}/Nm³</span><span class="output-grid-label">Max CH₄ Production Rate</span><span class="output-grid-value">{{ formatNumber(ch4.hourly_max, 1) }} Nm³/h</span><span class="output-grid-label">Total CH₄ Produced (Lifetime)</span><span class="output-grid-value">{{ formatNumber(ch4.total_prod_Nm3, 0) }} Nm³</span></div>
             </div>
         </div>
     </div>
@@ -409,21 +493,123 @@
 
     createApp({
         setup() {
-            const defaults = { pv_power: 1, annual_pv_yield: 1590, max_daily_pv_yield: 6.5, pv_capacity_density: 0.21, pv_capex: 300, pv_opex: 3, degradation_rate: 0.4, pv_lifetime: 20, dac_capex: 100000, co2_energy_demand: 3.34, dac_lifetime: 7, electrolyzer_capex: 150000, h2_energy_demand: 70, electrolyzer_lifetime: 7, reactor_capex: 100000, reactor_lifetime: 7, h2_stoich: 0.4, co2_stoich: 2.0, };
+            const defaults = { pv_power: 1, annual_pv_yield: 1590, max_daily_pv_yield: 6.5, pv_capacity_density: 0.21, pv_capex: 300, pv_opex: 3, degradation_rate: 0.4, pv_lifetime: 20, dac_capex: 100000, co2_energy_demand: 3.34, dac_lifetime: 7, electrolyzer_capex: 100000, h2_energy_demand: 70, electrolyzer_lifetime: 7, reactor_capex: 100000, reactor_lifetime: 7, h2_stoich: 0.4, co2_stoich: 2.0, };
             const inputs = ref({ ...defaults });
+            
+            const unitSystem = ref('SI'); // 'SI' or 'US'
             const pieChartCanvas = ref(null);
             let chartInstance = null;
+            
+            const EUR_TO_USD = 1.10;
+            const CONVERSIONS = {
+                M2_TO_ACRES: 0.000247105, NM3_TO_KCF: 0.0353147, NM3_TO_MCF: 0.0353147,
+                NM3_TO_SCF: 35.3147, MWH_TO_MMBTU: 3.41214, KWH_TO_BTU: 3412.14, M2_TO_FT2: 10.7639,
+            };
+            const currencySymbol = computed(() => unitSystem.value === 'SI' ? '€' : '$');
+            const currencyInputs = ['pv_capex', 'pv_opex', 'dac_capex', 'electrolyzer_capex', 'reactor_capex'];
 
-            const resetToDefaults = () => { inputs.value = { ...defaults }; };
+            const setUnitSystem = (system) => {
+                if (unitSystem.value === system) return;
+                const oldSystem = unitSystem.value;
+                unitSystem.value = system;
+                const conversionRate = (oldSystem === 'SI' && system === 'US') ? EUR_TO_USD : 1 / EUR_TO_USD;
+                currencyInputs.forEach(key => {
+                    inputs.value[key] = parseFloat((inputs.value[key] * conversionRate).toPrecision(4));
+                });
+            };
 
-            const pv = computed(() => { const i = inputs.value; if (i.pv_lifetime <= 0) return { total_capex: 0, total_opex: 0, total_electricity: 0, lcoe_dc: 0, land_area: 0 }; const pv_power_kw = i.pv_power * 1000; const total_capex = pv_power_kw * i.pv_capex; const total_opex = pv_power_kw * i.pv_opex * i.pv_lifetime; let total_electricity = 0; for (let n = 1; n <= i.pv_lifetime; n++) { total_electricity += i.annual_pv_yield * pv_power_kw * Math.pow(1 - i.degradation_rate / 100, n - 1); } const lcoe_dc = total_electricity > 0 ? (total_capex + total_opex) / total_electricity : 0; const land_area = i.pv_capacity_density > 0 ? pv_power_kw / i.pv_capacity_density : 0; return { total_capex, total_opex, total_electricity, lcoe_dc, land_area }; });
-            const ch4_energy_demand = computed(() => { const i = inputs.value; return (i.h2_stoich * i.h2_energy_demand) + (i.co2_stoich * i.co2_energy_demand); });
-            const co2 = computed(() => { const i = inputs.value; if (i.dac_lifetime <= 0 || i.pv_lifetime <= 0) return { max_daily_prod: 0, total_prod: 0, levelized_cost: 0, levelized_cost_capex_pct: 0, levelized_cost_opex_pct: 0, capex_per_kg: 0, opex_per_kg: 0 }; const total_capex = i.dac_capex * i.pv_power; const avg_annual_electricity = pv.value.total_electricity / i.pv_lifetime; const total_prod_lifetime_scaled = ch4_energy_demand.value > 0 ? (avg_annual_electricity * i.dac_lifetime / ch4_energy_demand.value) * i.co2_stoich : 0; const total_opex = pv.value.lcoe_dc * i.co2_energy_demand * total_prod_lifetime_scaled; const levelized_cost = total_prod_lifetime_scaled > 0 ? (total_capex + total_opex) / total_prod_lifetime_scaled : 0; const capex_per_kg = total_prod_lifetime_scaled > 0 ? total_capex / total_prod_lifetime_scaled : 0; const opex_per_kg = total_prod_lifetime_scaled > 0 ? total_opex / total_prod_lifetime_scaled : 0; return { total_prod: total_prod_lifetime_scaled, levelized_cost, levelized_cost_capex_pct: levelized_cost > 0 ? (capex_per_kg / levelized_cost) * 100 : 0, levelized_cost_opex_pct: levelized_cost > 0 ? (opex_per_kg / levelized_cost) * 100 : 0, max_daily_prod: ch4_energy_demand.value > 0 ? (i.pv_power * i.max_daily_pv_yield * 1000 / ch4_energy_demand.value) * i.co2_stoich : 0, capex_per_kg, opex_per_kg }; });
-            const h2 = computed(() => { const i = inputs.value; if (i.electrolyzer_lifetime <= 0 || i.pv_lifetime <= 0) return { max_daily_prod: 0, total_prod: 0, levelized_cost: 0, levelized_cost_capex_pct: 0, levelized_cost_opex_pct: 0, capex_per_kg: 0, opex_per_kg: 0 }; const total_capex = i.electrolyzer_capex * i.pv_power; const avg_annual_electricity = pv.value.total_electricity / i.pv_lifetime; const total_prod_lifetime_scaled = ch4_energy_demand.value > 0 ? (avg_annual_electricity * i.electrolyzer_lifetime / ch4_energy_demand.value) * i.h2_stoich : 0; const total_opex = pv.value.lcoe_dc * i.h2_energy_demand * total_prod_lifetime_scaled; const levelized_cost = total_prod_lifetime_scaled > 0 ? (total_capex + total_opex) / total_prod_lifetime_scaled : 0; const capex_per_kg = total_prod_lifetime_scaled > 0 ? total_capex / total_prod_lifetime_scaled : 0; const opex_per_kg = total_prod_lifetime_scaled > 0 ? total_opex / total_prod_lifetime_scaled : 0; return { total_prod: total_prod_lifetime_scaled, levelized_cost, levelized_cost_capex_pct: levelized_cost > 0 ? (capex_per_kg / levelized_cost) * 100 : 0, levelized_cost_opex_pct: levelized_cost > 0 ? (opex_per_kg / levelized_cost) * 100 : 0, max_daily_prod: ch4_energy_demand.value > 0 ? (i.pv_power * i.max_daily_pv_yield * 1000 / ch4_energy_demand.value) * i.h2_stoich : 0, capex_per_kg, opex_per_kg }; });
-            const ch4 = computed(() => { const i = inputs.value; if (i.reactor_lifetime <= 0 || i.pv_lifetime <= 0) return { hourly_max: 0, total_prod_Nm3: 0, levelized_capex_cost: 0 }; const avg_annual_electricity = pv.value.total_electricity / i.pv_lifetime; const total_prod_nm3_lifetime_scaled = ch4_energy_demand.value > 0 ? (avg_annual_electricity * i.reactor_lifetime / ch4_energy_demand.value) : 0; return { hourly_max: ch4_energy_demand.value > 0 ? (i.pv_power * 1000 / ch4_energy_demand.value) : 0, total_prod_Nm3: total_prod_nm3_lifetime_scaled, levelized_capex_cost: total_prod_nm3_lifetime_scaled > 0 ? (i.reactor_capex * i.pv_power) / total_prod_nm3_lifetime_scaled : 0 }; });
+            const resetToDefaults = () => {
+                unitSystem.value = 'SI';
+                inputs.value = { ...defaults };
+            };
+            
+            const siInputs = computed(() => {
+                if (unitSystem.value === 'SI') return inputs.value;
+                const converted = { ...inputs.value };
+                currencyInputs.forEach(key => { converted[key] = converted[key] / EUR_TO_USD; });
+                return converted;
+            });
+
+            const currencyConversionRate = computed(() => unitSystem.value === 'SI' ? 1 : EUR_TO_USD);
+            
+            const pv = computed(() => { 
+                const i = siInputs.value;
+                if (i.pv_lifetime <= 0) return { total_capex: 0, total_opex: 0, total_electricity: 0, lcoe_dc: 0, land_area: 0 }; 
+                const pv_power_kw = i.pv_power * 1000; 
+                const total_capex = pv_power_kw * i.pv_capex; 
+                const total_opex = pv_power_kw * i.pv_opex * i.pv_lifetime; 
+                let total_electricity = 0; 
+                for (let n = 1; n <= i.pv_lifetime; n++) { total_electricity += i.annual_pv_yield * pv_power_kw * Math.pow(1 - i.degradation_rate / 100, n - 1); } 
+                const lcoe_dc = total_electricity > 0 ? (total_capex + total_opex) / total_electricity : 0; 
+                const land_area = i.pv_capacity_density > 0 ? pv_power_kw / i.pv_capacity_density : 0; 
+                return { 
+                    total_capex: total_capex * currencyConversionRate.value, 
+                    total_opex: total_opex * currencyConversionRate.value, 
+                    total_electricity, 
+                    lcoe_dc: lcoe_dc * currencyConversionRate.value, 
+                    land_area 
+                }; 
+            });
+
+            const ch4_energy_demand = computed(() => { const i = siInputs.value; return (i.h2_stoich * i.h2_energy_demand) + (i.co2_stoich * i.co2_energy_demand); });
+            
+            const co2 = computed(() => { 
+                const i = siInputs.value; 
+                if (i.dac_lifetime <= 0 || i.pv_lifetime <= 0) return { max_daily_prod: 0, total_prod: 0, levelized_cost: 0, levelized_cost_capex_pct: 0, levelized_cost_opex_pct: 0, capex_per_kg: 0, opex_per_kg: 0 }; 
+                const total_capex = i.dac_capex * i.pv_power; 
+                const avg_annual_electricity = pv.value.total_electricity / i.pv_lifetime; 
+                const total_prod_lifetime_scaled = ch4_energy_demand.value > 0 ? (avg_annual_electricity * i.dac_lifetime / ch4_energy_demand.value) * i.co2_stoich : 0; 
+                const total_opex = (pv.value.lcoe_dc / currencyConversionRate.value) * i.co2_energy_demand * total_prod_lifetime_scaled;
+                const levelized_cost_si = total_prod_lifetime_scaled > 0 ? (total_capex + total_opex) / total_prod_lifetime_scaled : 0; 
+                const capex_per_kg_si = total_prod_lifetime_scaled > 0 ? total_capex / total_prod_lifetime_scaled : 0; 
+                const opex_per_kg_si = total_prod_lifetime_scaled > 0 ? total_opex / total_prod_lifetime_scaled : 0; 
+                return { 
+                    total_prod: total_prod_lifetime_scaled, 
+                    levelized_cost: levelized_cost_si * currencyConversionRate.value,
+                    levelized_cost_capex_pct: levelized_cost_si > 0 ? (capex_per_kg_si / levelized_cost_si) * 100 : 0, 
+                    levelized_cost_opex_pct: levelized_cost_si > 0 ? (opex_per_kg_si / levelized_cost_si) * 100 : 0, 
+                    max_daily_prod: ch4_energy_demand.value > 0 ? (inputs.value.pv_power * inputs.value.max_daily_pv_yield * 1000 / ch4_energy_demand.value) * i.co2_stoich : 0, 
+                    capex_per_kg: capex_per_kg_si * currencyConversionRate.value,
+                    opex_per_kg: opex_per_kg_si * currencyConversionRate.value
+                }; 
+            });
+            
+            const h2 = computed(() => { 
+                const i = siInputs.value; 
+                if (i.electrolyzer_lifetime <= 0 || i.pv_lifetime <= 0) return { max_daily_prod: 0, total_prod: 0, levelized_cost: 0, levelized_cost_capex_pct: 0, levelized_cost_opex_pct: 0, capex_per_kg: 0, opex_per_kg: 0 }; 
+                const total_capex = i.electrolyzer_capex * i.pv_power; 
+                const avg_annual_electricity = pv.value.total_electricity / i.pv_lifetime; 
+                const total_prod_lifetime_scaled = ch4_energy_demand.value > 0 ? (avg_annual_electricity * i.electrolyzer_lifetime / ch4_energy_demand.value) * i.h2_stoich : 0; 
+                const total_opex = (pv.value.lcoe_dc / currencyConversionRate.value) * i.h2_energy_demand * total_prod_lifetime_scaled;
+                const levelized_cost_si = total_prod_lifetime_scaled > 0 ? (total_capex + total_opex) / total_prod_lifetime_scaled : 0; 
+                const capex_per_kg_si = total_prod_lifetime_scaled > 0 ? total_capex / total_prod_lifetime_scaled : 0; 
+                const opex_per_kg_si = total_prod_lifetime_scaled > 0 ? total_opex / total_prod_lifetime_scaled : 0; 
+                return { 
+                    total_prod: total_prod_lifetime_scaled, 
+                    levelized_cost: levelized_cost_si * currencyConversionRate.value, 
+                    levelized_cost_capex_pct: levelized_cost_si > 0 ? (capex_per_kg_si / levelized_cost_si) * 100 : 0, 
+                    levelized_cost_opex_pct: levelized_cost_si > 0 ? (opex_per_kg_si / levelized_cost_si) * 100 : 0, 
+                    max_daily_prod: ch4_energy_demand.value > 0 ? (inputs.value.pv_power * inputs.value.max_daily_pv_yield * 1000 / ch4_energy_demand.value) * i.h2_stoich : 0, 
+                    capex_per_kg: capex_per_kg_si * currencyConversionRate.value, 
+                    opex_per_kg: opex_per_kg_si * currencyConversionRate.value 
+                }; 
+            });
+
+            const ch4 = computed(() => { 
+                const i = siInputs.value; 
+                if (i.reactor_lifetime <= 0 || i.pv_lifetime <= 0) return { hourly_max: 0, total_prod_Nm3: 0, levelized_capex_cost: 0 }; 
+                const avg_annual_electricity = pv.value.total_electricity / i.pv_lifetime; 
+                const total_prod_nm3_lifetime_scaled = ch4_energy_demand.value > 0 ? (avg_annual_electricity * i.reactor_lifetime / ch4_energy_demand.value) : 0; 
+                const levelized_capex_cost_si = total_prod_nm3_lifetime_scaled > 0 ? (i.reactor_capex * i.pv_power) / total_prod_nm3_lifetime_scaled : 0;
+                return { 
+                    hourly_max: ch4_energy_demand.value > 0 ? (i.pv_power * 1000 / ch4_energy_demand.value) : 0, 
+                    total_prod_Nm3: total_prod_nm3_lifetime_scaled, 
+                    levelized_capex_cost: levelized_capex_cost_si * currencyConversionRate.value
+                }; 
+            });
             
             const costBreakdownForDisplay = computed(() => {
-                const i = inputs.value;
+                const i = siInputs.value;
                 return [
                     { label: 'H₂ CAPEX', value: h2.value.capex_per_kg * i.h2_stoich, color: '#00796b' },
                     { label: 'H₂ OPEX', value: h2.value.opex_per_kg * i.h2_stoich, color: '#80cbc4' },
@@ -433,16 +619,30 @@
                 ];
             });
 
+            const costBreakdownConverted = computed(() => {
+                const si_levelized_ch4_cost = costBreakdownForDisplay.value.reduce((sum, item) => sum + item.value, 0) / currencyConversionRate.value;
+                const to_mwh_factor = 100;
+                const total_cost_mwh = si_levelized_ch4_cost * to_mwh_factor * currencyConversionRate.value;
+                
+                const unit_conversion_factor = unitSystem.value === 'SI' ? 1 : 1 / CONVERSIONS.MWH_TO_MMBTU;
+                
+                const totalDisplayCost = total_cost_mwh * unit_conversion_factor;
+                
+                return costBreakdownForDisplay.value.map(item => ({
+                    ...item,
+                    displayValue: totalDisplayCost > 0 ? (item.value / (si_levelized_ch4_cost * currencyConversionRate.value)) * totalDisplayCost : 0
+                }));
+            });
+
             const overall = computed(() => {
-                const i = inputs.value;
+                const i = siInputs.value;
                 const levelized_ch4_cost = costBreakdownForDisplay.value.reduce((sum, item) => sum + item.value, 0);
                 const electricity_per_m2_year = (pv.value.land_area > 0 && i.pv_lifetime > 0) ? pv.value.total_electricity / (pv.value.land_area * i.pv_lifetime) : 0;
                 const nm3_ch4_per_m2_year = ch4_energy_demand.value > 0 ? electricity_per_m2_year / ch4_energy_demand.value : 0;
-                
                 return {
                     levelized_ch4_cost,
-                    cost_per_MWh: levelized_ch4_cost * 100,
-                    ch4_max_daily: ch4_energy_demand.value > 0 ? (i.pv_power * i.max_daily_pv_yield * 1000 / ch4_energy_demand.value) : 0,
+                    cost_per_MWh: (levelized_ch4_cost / currencyConversionRate.value) * 100 * currencyConversionRate.value,
+                    ch4_max_daily: ch4_energy_demand.value > 0 ? (inputs.value.pv_power * inputs.value.max_daily_pv_yield * 1000 / ch4_energy_demand.value) : 0,
                     ch4_energy_demand: ch4_energy_demand.value,
                     ch4_energy_contrib_h2: ch4_energy_demand.value > 0 ? (i.h2_stoich * i.h2_energy_demand / ch4_energy_demand.value) * 100 : 0,
                     ch4_energy_contrib_co2: ch4_energy_demand.value > 0 ? (i.co2_stoich * i.co2_energy_demand / ch4_energy_demand.value) * 100 : 0,
@@ -459,29 +659,30 @@
             
             onMounted(() => {
                 if (pieChartCanvas.value) {
+                    const initialData = costBreakdownConverted.value;
                     chartInstance = new Chart(pieChartCanvas.value.getContext('2d'), {
-                        type: 'pie',
-                        data: {
-                            labels: costBreakdownForDisplay.value.map(d => d.label),
-                            datasets: [{
-                                data: costBreakdownForDisplay.value.map(d => d.value),
-                                backgroundColor: costBreakdownForDisplay.value.map(d => d.color),
-                                borderWidth: 1,
-                                borderColor: '#fff'
-                            }]
+                        type: 'pie', 
+                        data: { 
+                            labels: initialData.map(d => d.label), 
+                            datasets: [{ 
+                                data: initialData.map(d => d.displayValue), 
+                                backgroundColor: initialData.map(d => d.color), 
+                                borderWidth: 1, 
+                                borderColor: '#fff' 
+                            }] 
                         },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: false },
-                                tooltip: {
+                        options: { 
+                            responsive: true, 
+                            maintainAspectRatio: false, 
+                            plugins: { 
+                                legend: { display: false }, 
+                                tooltip: { 
                                     callbacks: {
-                                        // === UPDATED TOOLTIP CALLBACK ===
-                                        label: function(context) {
-                                            let label = context.label || '';
-                                            let value = context.raw || 0;
-                                            return `${label}: ${formatNumber(value * 100, 2)} €/MWh`;
+                                        label: (context) => {
+                                            let label = context.label || ''; 
+                                            let value = context.raw || 0; 
+                                            const unitLabel = unitSystem.value === 'SI' ? 'MWh' : 'MMBTU';
+                                            return `${label}: ${formatNumber(value, 2)} ${currencySymbol.value}/${unitLabel}`;
                                         }
                                     }
                                 }
@@ -491,21 +692,20 @@
                 }
             });
 
-            watch(costBreakdownForDisplay, (newData) => {
+            watch(costBreakdownConverted, (newData) => {
                 if (chartInstance) {
-                    chartInstance.data.datasets[0].data = newData.map(d => d.value);
+                    chartInstance.data.labels = newData.map(d => d.label);
+                    chartInstance.data.datasets[0].data = newData.map(d => d.displayValue);
+                    chartInstance.data.datasets[0].backgroundColor = newData.map(d => d.color);
                     chartInstance.update('none');
                 }
-            });
+            }, { deep: true }); // ***FIX***: Removed the 'immediate: true' option
             
-            onBeforeUnmount(() => {
-                if(chartInstance) chartInstance.destroy();
-            });
+            onBeforeUnmount(() => { if(chartInstance) chartInstance.destroy(); });
 
-            return { inputs, resetToDefaults, formatNumber, pv, co2, h2, ch4, overall, pieChartCanvas, costBreakdownForDisplay };
+            return { inputs, resetToDefaults, formatNumber, pv, co2, h2, ch4, overall, pieChartCanvas, unitSystem, setUnitSystem, currencySymbol, CONVERSIONS, costBreakdownConverted };
         }
     }).mount('#app');
 </script>
-
 </body>
 </html>
